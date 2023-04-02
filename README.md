@@ -18,4 +18,4 @@ Inline, block, and reference extensions to Markdown
 * Sections: From Heading until the next same level heading or end of file. Sections have implicit IDs
 * References: `&{ref infostring: refval};` References copy the refval into place here.
 * Ref infostring: `move|copy` If copy (default), copies the content from there to here. If move, removes value from there.
-* Refval: `#id ./relative_path`
+* Refval: `#id`, `./relative_path`, `./adjacent.md#id`
