@@ -23,7 +23,7 @@ await Promise.all(
 
       const html = toHTML(md);
 
-      assert.equal(html, golden);
+      assert.strictEqual(html, golden);
     });
   })
 );

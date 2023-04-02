@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { test } from "node:test";
-import { parseInfo, renderParseInfo } from "./inline.mjs";
+import { parseInfo, renderInfo } from "./info.mjs";
 
 test("finds tag", () => {
   const spec = parseInfo("img");
@@ -51,7 +51,7 @@ test("accepts first found tag", () => {
 });
 
 test("img", () => {
-  const rendered = renderParseInfo(
+  const rendered = renderInfo(
     {
       tag: "img",
       id: "id",
@@ -68,7 +68,7 @@ test("img", () => {
 });
 
 test("span", () => {
-  const rendered = renderParseInfo(
+  const rendered = renderInfo(
     {
       tag: "span",
       id: "",
