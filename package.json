@@ -1,0 +1,21 @@
+{
+  "name": "@davidsouther/jiffdown",
+  "version": "1.0.0",
+  "description": "Inline, block, and reference extensions to Markdown",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jefri/jiffdown.git"
+  },
+  "author": "David Souther <davidsouther+github@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jefri/jiffdown/issues"
+  },
+  "homepage": "https://github.com/jefri/jiffdown#readme",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "marked": "^4.3.0"
+  }
+}
