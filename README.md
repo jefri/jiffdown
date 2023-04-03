@@ -22,17 +22,22 @@ Inline, block, and reference extensions to Markdown
 
 # Syntaxes
 
-| Symbol          | Usage      | Status |
-| --------------- | ---------- | ------ |
-| #, ##           | Headings   | ✅     |
-| -, 1., \:       | List       | ✅     |
-| >{}             | Blocks     | ✅     |
-| \[]()           | Link       | ✅     |
-| !\[]()          | Image Link | ✅     |
-| {}              | Inline     | ✅     |
-| {img src="url"} | Image      | ✅     |
-| &...;           | Entity     |        |
-| &{};            | Reference  |
-| `               | Code       | ✅     |
-| $               | Math       |
-| \_, \*, ~       | Formatting | ✅     |
+| Symbol          | Usage            | Status                  |
+| --------------- | ---------------- | ----------------------- |
+| ---\n\n---      | yaml frontmatter | [✅ (front-matter)](fm) |
+| #, ##           | Headings         | ✅                      |
+| sections        | \<section>       |                         |
+| -, 1., \:       | List             | ✅                      |
+| >{}             | Blocks           | ✅                      |
+| \[]()           | Link             | ✅                      |
+| !\[]()          | Image Link       | ✅                      |
+| \<br>           | HTML             | ✅                      |
+| {time:10/11/23} | Inline           | ✅                      |
+| {img src="url"} | Image            | ✅                      |
+| &...;           | Entity           |                         |
+| &{};            | Reference        |
+| `               | Code             | ✅                      |
+| \_, \*, ~       | Formatting       | ✅                      |
+| $               | Math             |
+
+[fm]: https://www.npmjs.com/package/front-matter
