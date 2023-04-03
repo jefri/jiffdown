@@ -27,6 +27,7 @@ const RegisterEntities = {
         raw: match[0],
       };
     }
+    return false;
   },
   renderer() {
     return "";
@@ -52,9 +53,10 @@ const LookupEntites = {
         name,
       };
     }
+    return false;
   },
-  renderer(src) {
-    return KNOWN_ENTITIES.get(src.name) ?? src.name;
+  renderer(token) {
+    return KNOWN_ENTITIES.get(token.name) ?? token.name;
   },
 };
 
