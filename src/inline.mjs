@@ -32,4 +32,4 @@ const INLINE = {
   },
 };
 
-export default INLINE;
+export default { extensions: [INLINE] };

@@ -36,4 +36,4 @@ const BLOCK_INFO = {
   },
 };
 
-export default BLOCK_INFO;
+export default { extensions: [BLOCK_INFO] };
