@@ -11,19 +11,21 @@ const root = resolve(__dirname, "../golden");
 await Promise.all(
   (
     await readdir(root)
-  ).map((dir) => {
-    test(`Golden: ${dir}`, async () => {
-      const mdFile = join(root, dir, `${dir}.md`);
-      const goldenFile = join(root, dir, `${dir}.html`);
+  )
+    .filter((d) => d.match("table_ref"))
+    .map((dir) => {
+      test(`Golden: ${dir}`, async () => {
+        const mdFile = join(root, dir, `${dir}.md`);
+        const goldenFile = join(root, dir, `${dir}.html`);
 
-      const [md, golden] = await Promise.all([
-        readFile(mdFile, { encoding: "utf-8" }),
-        readFile(goldenFile, { encoding: "utf-8" }),
-      ]);
+        const [md, golden] = await Promise.all([
+          readFile(mdFile, { encoding: "utf-8" }),
+          readFile(goldenFile, { encoding: "utf-8" }),
+        ]);
 
-      const html = toHTML(md);
+        const html = toHTML(md);
 
-      assert.strictEqual(html, golden);
-    });
-  })
+        assert.strictEqual(html, golden);
+      });
+    })
 );

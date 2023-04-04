@@ -43,7 +43,7 @@ const LookupEntites = {
     return src.indexOf("&");
   },
   tokenizer(src) {
-    const match = src.match(/^&(?<name>[^:;]+);/);
+    const match = src.match(/^&(?<name>(?!\{)[^:;]+);/);
     if (match) {
       const { name } = match.groups;
       if (isHtmlEntity(name)) return false;

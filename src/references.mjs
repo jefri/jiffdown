@@ -8,10 +8,10 @@ function findReference(name) {
   return REFERENCES.get(name);
 }
 
-const ReferencesName = "references";
+const BlockReferencesName = "block-references";
 /** @type {marked.TokenizerAndRendererExtension} */
-const References = {
-  name: ReferencesName,
+const BlockReferences = {
+  name: BlockReferencesName,
   level: "block",
   start(src) {
     return src.indexOf("&{");
@@ -20,7 +20,34 @@ const References = {
     const match = src.match(/^&\{(?<ref>[^}]+)};/);
     if (match) {
       return {
-        type: ReferencesName,
+        type: BlockReferencesName,
+        raw: match[0],
+        reference: match.groups.ref,
+      };
+    }
+    return false;
+  },
+  renderer(token) {
+    const reference = findReference(token.reference);
+    const tokens =
+      reference.type === "section" ? reference.tokens : [reference];
+    return this.parser.parse(tokens);
+  },
+};
+
+const InlineReferencesName = "inline-references";
+/** @type {marked.TokenizerAndRendererExtension} */
+const InlineReferences = {
+  name: InlineReferencesName,
+  level: "inline",
+  start(src) {
+    return src.indexOf("&{");
+  },
+  tokenizer(src) {
+    const match = src.match(/^&\{(?<ref>[^}]+)};/);
+    if (match) {
+      return {
+        type: InlineReferencesName,
         raw: match[0],
         reference: match.groups.ref,
       };
@@ -45,6 +72,7 @@ const Sections = {
   },
 };
 
+const slugger = new marked.Slugger();
 const _walkTokens = marked.walkTokens;
 marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
   const values = _walkTokens.call(marked, tokens, callback);
@@ -66,8 +94,7 @@ marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
   for (; i < tokens.length; i++) {
     const token = tokens[i];
     const pushSection = () => {
-      const id =
-        "#" + new marked.Slugger().slug(token.raw.replace(/^#+[\s\t]+/, ""));
+      const id = "#" + slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
       const section = {
         type: "section",
         id,
@@ -107,6 +134,6 @@ function walkTokens(token) {
 }
 
 export default {
-  extensions: [Sections, References],
+  extensions: [Sections, BlockReferences, InlineReferences],
   walkTokens,
 };
