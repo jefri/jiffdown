@@ -12,7 +12,7 @@ await Promise.all(
   (
     await readdir(root)
   )
-    .filter((d) => d.match("table_ref"))
+    // .filter((root) => root.includes("reference"))
     .map((dir) => {
       test(`Golden: ${dir}`, async () => {
         const mdFile = join(root, dir, `${dir}.md`);

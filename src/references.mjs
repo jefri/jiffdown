@@ -8,37 +8,10 @@ function findReference(name) {
   return REFERENCES.get(name);
 }
 
-const BlockReferencesName = "block-references";
+const ReferencesName = "references";
 /** @type {marked.TokenizerAndRendererExtension} */
-const BlockReferences = {
-  name: BlockReferencesName,
-  level: "block",
-  start(src) {
-    return src.indexOf("&{");
-  },
-  tokenizer(src) {
-    const match = src.match(/^&\{(?<ref>[^}]+)};/);
-    if (match) {
-      return {
-        type: BlockReferencesName,
-        raw: match[0],
-        reference: match.groups.ref,
-      };
-    }
-    return false;
-  },
-  renderer(token) {
-    const reference = findReference(token.reference);
-    const tokens =
-      reference.type === "section" ? reference.tokens : [reference];
-    return this.parser.parse(tokens);
-  },
-};
-
-const InlineReferencesName = "inline-references";
-/** @type {marked.TokenizerAndRendererExtension} */
-const InlineReferences = {
-  name: InlineReferencesName,
+const References = {
+  name: ReferencesName,
   level: "inline",
   start(src) {
     return src.indexOf("&{");
@@ -47,7 +20,7 @@ const InlineReferences = {
     const match = src.match(/^&\{(?<ref>[^}]+)};/);
     if (match) {
       return {
-        type: InlineReferencesName,
+        type: ReferencesName,
         raw: match[0],
         reference: match.groups.ref,
       };
@@ -67,14 +40,16 @@ const SectionsName = "section";
 const Sections = {
   name: SectionsName,
   renderer(token) {
-    if (MOVED.has(token.id)) return "";
-    return `<section>\n${this.parser.parse(token.tokens)}</section>\n`;
+    if (token.type === SectionsName && !MOVED.has(token.id)) {
+      return `<section>\n${this.parser.parse(token.tokens)}</section>\n`;
+    }
+    return "";
   },
 };
 
-const slugger = new marked.Slugger();
 const _walkTokens = marked.walkTokens;
 marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
+  const slugger = new marked.Slugger();
   const values = _walkTokens.call(marked, tokens, callback);
 
   /** @type {marked.Token[]} */
@@ -96,7 +71,7 @@ marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
     const pushSection = () => {
       const id = "#" + slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
       const section = {
-        type: "section",
+        type: SectionsName,
         id,
         start: i,
         depth: token.depth,
@@ -112,7 +87,9 @@ marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
       } else if (token.depth > stack.at(-1).depth) {
         pushSection(token);
       } else {
-        popSection();
+        while (token.depth <= stack.at(-1).depth) {
+          popSection();
+        }
         pushSection(token);
       }
     } else if (stack.length > 0) {
@@ -134,6 +111,6 @@ function walkTokens(token) {
 }
 
 export default {
-  extensions: [Sections, BlockReferences, InlineReferences],
+  extensions: [Sections, References],
   walkTokens,
 };

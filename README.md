@@ -26,7 +26,7 @@ Inline, block, and reference extensions to Markdown
 | --------------- | ---------------- | ----------------------- |
 | ---\n\n---      | yaml frontmatter | [✅ (front-matter)](fm) |
 | #, ##           | Headings         | ✅                      |
-| sections        | \<section>       |                         |
+| sections        | \<section>       | ✅                      |
 | -, 1., \:       | List             | ✅                      |
 | >{}             | Blocks           | ✅                      |
 | \[]()           | Link             | ✅                      |
@@ -34,8 +34,8 @@ Inline, block, and reference extensions to Markdown
 | \<br>           | HTML             | ✅                      |
 | {time:10/11/23} | Inline           | ✅                      |
 | {img src="url"} | Image            | ✅                      |
-| &...;           | Entity           |                         |
-| &{};            | Reference        |
+| &...;           | Entity           | ✅                      |
+| &{};            | Reference        | ✅                      |
 | `               | Code             | ✅                      |
 | \_, \*, ~       | Formatting       | ✅                      |
 | $               | Math             |
