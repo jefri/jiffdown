@@ -1,6 +1,8 @@
-import { marked } from "marked";
+import Slugger from "github-slugger";
 
+/** @type {Map<string, string>} */
 const REFERENCES = new Map();
+/** @type {Set<string>} */
 const MOVED = new Set();
 
 function findReference(name) {
@@ -9,7 +11,7 @@ function findReference(name) {
 }
 
 const ReferencesName = "references";
-/** @type {marked.TokenizerAndRendererExtension} */
+/** @type {import("marked").TokenizerAndRendererExtension} */
 const References = {
   name: ReferencesName,
   level: "inline",
@@ -28,15 +30,19 @@ const References = {
     return false;
   },
   renderer(token) {
-    const reference = findReference(token.reference);
-    const tokens =
-      reference.type === "section" ? reference.tokens : [reference];
-    return this.parser.parse(tokens);
+    const reference = findReference(token.reference.replace("#", ""));
+    if (reference) {
+      const tokens =
+        reference.type === "section" ? reference.tokens : [reference];
+      return this.parser.parse(tokens);
+    } else {
+      return this.parser.parse(token.tokens ?? []);
+    }
   },
 };
 
 const SectionsName = "section";
-/** @type {marked.RendererExtension} */
+/** @type {import("marked").RendererExtension} */
 const Sections = {
   name: SectionsName,
   renderer(token) {
@@ -47,70 +53,81 @@ const Sections = {
   },
 };
 
-const _walkTokens = marked.walkTokens;
-marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
-  const slugger = new marked.Slugger();
-  const values = _walkTokens.call(marked, tokens, callback);
+export function replaceWalkTokens(marked) {
+  const _walkTokens = marked.walkTokens;
+  marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
+    const slugger = new Slugger();
+    const values = _walkTokens.call(marked, tokens, callback);
 
-  /** @type {marked.Token[]} */
-  const stack = [];
+    /** @type {marked.Token[]} */
+    const stack = [];
 
-  let i = 0;
-  function popSection() {
-    const section = stack.pop();
-    if (stack.length > 0) {
-      stack.at(-1).tokens.push(section);
-    } else {
-      tokens.splice(section.start, i, section);
-      i = section.start + 1;
-    }
-  }
-
-  for (; i < tokens.length; i++) {
-    const token = tokens[i];
-    const pushSection = () => {
-      const id = "#" + slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
-      const section = {
-        type: SectionsName,
-        id,
-        start: i,
-        depth: token.depth,
-        tokens: [token],
-      };
-      REFERENCES.set(id, section);
-      stack.push(section);
-    };
-
-    if (token.type === "heading") {
-      if (stack.length === 0) {
-        pushSection(token);
-      } else if (token.depth > stack.at(-1).depth) {
-        pushSection(token);
+    let i = 0;
+    function popSection() {
+      const section = stack.pop();
+      if (stack.length > 0) {
+        stack.at(-1).tokens.push(section);
       } else {
-        while (token.depth <= stack.at(-1).depth) {
-          popSection();
-        }
-        pushSection(token);
+        tokens.splice(section.start, i, section);
+        i = section.start + 1;
       }
-    } else if (stack.length > 0) {
-      stack.at(-1).tokens.push(token);
     }
-  }
 
-  while (stack.length > 0) {
-    popSection();
-  }
+    for (; i < tokens.length; i++) {
+      const token = tokens[i];
+      const pushSection = () => {
+        // const id = slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
+        const id = slugger.slug(token.text);
+        const section = {
+          type: SectionsName,
+          id,
+          start: i,
+          depth: token.depth,
+          tokens: [token],
+        };
+        token.id = id;
+        REFERENCES.set(id, section);
+        stack.push(section);
+      };
 
-  return values;
-};
+      if (token.type === "heading") {
+        if (stack.length === 0) {
+          pushSection(token);
+        } else if (token.depth > stack.at(-1)?.depth) {
+          pushSection(token);
+        } else {
+          while (token.depth <= stack.at(-1)?.depth) {
+            popSection();
+          }
+          pushSection(token);
+        }
+      } else if (stack.length > 0) {
+        stack.at(-1).tokens.push(token);
+      }
+    }
 
-function walkTokens(token) {
-  if (token.id) {
-    REFERENCES.set(token.id, token);
-  }
+    while (stack.length > 0) {
+      popSection();
+    }
+
+    return values;
+  };
 }
 
 export default {
+  name: "references",
+  renderer: {
+    heading(token) {
+      const { tokens, depth } = token;
+      const text = this.parser.parseInline(tokens);
+      let id = token.id ? `id="${token.id}"` : "";
+      return `<h${depth} ${id}>${text}</h${depth}>\n`;
+    },
+  },
   extensions: [Sections, References],
-  walkTokens,
+  walkTokens(token) {
+    if (token.id) {
+      REFERENCES.set(token.id, token);
+    }
+  },
 };

@@ -2,7 +2,7 @@ import assert from "assert";
 import { readdir, readFile } from "fs/promises";
 import test from "node:test";
 import { dirname, join, resolve } from "path";
-import { toHTML } from "../src/index.mjs";
+import { toHTML } from "../index.mjs";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

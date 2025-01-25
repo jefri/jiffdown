@@ -14,7 +14,7 @@ const RegisterEntities = {
   name: RegisterEntitiesName,
   level: "inline",
   start(src) {
-    src.indexOf("&");
+    return src.indexOf("&");
   },
   tokenizer(src) {
     const match = src.match(/^&(?<name>[^:]+):(?<value>[^;]+);/);

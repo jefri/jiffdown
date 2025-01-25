@@ -12,7 +12,18 @@ const BLOCK_INFO = {
   },
   tokenizer(src) {
     const match = src.match(
-      /^(?<leader> *>[ \t]?\{(?<info>[^}]+)\}).*(?:\n\n|$)?/
+      // Anchor to start
+      // Capture group named leader
+      //  Any number of space or tab characters
+      //  Literal >
+      //  Zero or one space or tab
+      //  Literal {
+      //  Capture group inside leader named info
+      //      Capture tokens up to next } (no nested infoblocks)
+      //  Literal }
+      // The rest of the content
+      // Noncaptureing group of two newlines or end of string, optional.
+      /^(?<leader>[ \t]*>[ \t]?\{(?<info>[^}]+)\}).*(?:\n\n|$)?/
     );
     if (match) {
       const text = src
