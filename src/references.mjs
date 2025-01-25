@@ -54,6 +54,8 @@ const Sections = {
 };
 
 export function replaceWalkTokens(marked) {
+  REFERENCES.clear();
+  MOVED.clear();
   const _walkTokens = marked.walkTokens;
   marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
     const slugger = new Slugger();
@@ -68,39 +70,41 @@ export function replaceWalkTokens(marked) {
       if (stack.length > 0) {
         stack.at(-1).tokens.push(section);
       } else {
-        tokens.splice(section.start, i, section);
-        i = section.start + 1;
+        tokens.splice(section.pos, i - section.pos, section);
+        i = section.pos + 1;
       }
     }
 
     for (; i < tokens.length; i++) {
       const token = tokens[i];
       const pushSection = () => {
-        // const id = slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
-        const id = slugger.slug(token.text);
+        const id = slugger.slug(token.id ?? token.text);
         const section = {
           type: SectionsName,
           id,
-          start: i,
+          pos: i,
           depth: token.depth,
-          tokens: [token],
+          tokens: [],
         };
-        token.id = id;
         REFERENCES.set(id, section);
         stack.push(section);
+        token.id = section.id;
+        return section;
       };
 
       if (token.type === "heading") {
-        if (stack.length === 0) {
-          pushSection(token);
-        } else if (token.depth > stack.at(-1)?.depth) {
-          pushSection(token);
-        } else {
-          while (token.depth <= stack.at(-1)?.depth) {
-            popSection();
-          }
-          pushSection(token);
+        while (token.depth <= stack.at(-1)?.depth) {
+          popSection();
         }
+        let section = pushSection();
+        section.tokens.push(token);
+      } else if (token.type == "block-info" && token.info.tag == "section") {
+        // A section block-info starts a new section at the current depth
+        token.depth = (stack.at(-1)?.depth ?? 0) + 1;
+        if (stack.length > 0) {
+          popSection();
+        }
+        pushSection();
       } else if (stack.length > 0) {
         stack.at(-1).tokens.push(token);
       }

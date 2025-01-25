@@ -10,7 +10,6 @@ import references, { replaceWalkTokens } from "./src/references.mjs";
 // import hljs from "highlight.js";
 
 const marked = new Marked();
-replaceWalkTokens(marked);
 marked.use(references);
 marked.use(blockInfo);
 marked.use(inline);
@@ -19,5 +18,6 @@ marked.use(entities);
 
 /** @param {string} md */
 export function toHTML(md) {
+  replaceWalkTokens(marked);
   return marked.parse(md);
 }

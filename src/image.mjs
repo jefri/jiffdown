@@ -1,19 +1,24 @@
+import { parseInfo } from "./info.mjs";
+
 /**
  * Process an inline image with the format `![Alt Text][src "=size title"]`.
  * Title can start with size as `=[width]:[height] `, which will be be extracted
  * and applied to the rendered img tag.
  */
-function image(src, mdTitle, alt) {
-  mdTitle = mdTitle ?? "";
-  let { width, height, title } = mdTitle.match(
-    /^(?:=(?<width>[^\s:]*)(:(?<height>[^\s]+))?)\s*(?<title>.*)$/
-  )?.groups ?? { width: "", height: "", title: mdTitle };
+function image({ href, text }) {
+  let { info, alt } = text.match(/^(?:\{(?<info>[^}]+)\})?\s*(?<alt>.*)?/)
+    ?.groups ?? { info: "", alt: text };
 
-  width = width ? ` width="${width}"` : "";
-  height = height ? ` height="${height}"` : "";
-  title = title ? ` title="${title}"` : "";
+  info = parseInfo(info);
 
-  return `<img src="${src}" alt="${alt}"${width}${height}${title} />`;
+  let width = info.attributes.width ? ` width="${info.attributes.width}"` : "";
+  let height = info.attributes.height
+    ? ` height="${info.attributes.height}"`
+    : "";
+  let classname =
+    info.classes.length > 0 ? ` class="${info.classes.join(" ")}" ` : " ";
+
+  return `<img src="${href}"${classname}alt="${alt}"${width}${height} />`;
 }
 
 // /** @type {import("marked").RendererExtension} */

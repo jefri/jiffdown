@@ -37,6 +37,9 @@ const BLOCK_INFO = {
         text,
         info: parseInfo(match.groups.info),
       };
+      if (token.info.id) {
+        token.id = token.info.id;
+      }
       this.lexer.blockTokens(token.text, token.tokens);
       return token;
     }
