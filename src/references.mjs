@@ -31,13 +31,10 @@ const References = {
   },
   renderer(token) {
     const reference = findReference(token.reference.replace("#", ""));
-    if (reference) {
-      const tokens =
-        reference.type === "section" ? reference.tokens : [reference];
-      return this.parser.parse(tokens);
-    } else {
-      return this.parser.parse(token.tokens ?? []);
-    }
+    const tokens =
+      reference ?
+        (reference.type === "section" ? reference.tokens : [reference]) : [];
+    return this.parser.parse(tokens);
   },
 };
 
@@ -67,24 +64,26 @@ export function replaceWalkTokens(marked) {
     let i = 0;
     function popSection() {
       const section = stack.pop();
+      if (!section) return;
       if (stack.length > 0) {
         stack.at(-1).tokens.push(section);
       } else {
-        tokens.splice(section.pos, i - section.pos, section);
-        i = section.pos + 1;
+        tokens.splice(section.start, i, section);
+        i = section.start + 1;
       }
     }
 
     for (; i < tokens.length; i++) {
       const token = tokens[i];
       const pushSection = () => {
-        const id = slugger.slug(token.id ?? token.text);
+        const slug = slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
+        const id = `#${slug}`;
         const section = {
           type: SectionsName,
           id,
-          pos: i,
+          start: i,
           depth: token.depth,
-          tokens: [],
+          tokens: [token],
         };
         REFERENCES.set(id, section);
         stack.push(section);
@@ -93,12 +92,18 @@ export function replaceWalkTokens(marked) {
       };
 
       if (token.type === "heading") {
-        while (token.depth <= stack.at(-1)?.depth) {
-          popSection();
+        if (stack.length === 0) {
+          pushSection(token);
+        } else if (token.depth > stack.at(-1).depth) {
+          pushSection(token);
+        } else {
+          while (stack.at(-1) && token.depth <= stack.at(-1).depth) {
+            popSection();
+          }
         }
-        let section = pushSection();
+        const section = pushSection();
         section.tokens.push(token);
-      } else if (token.type == "block-info" && token.info.tag == "section") {
+      } else if (token.type === "block-info" && token.info.tag === "section") {
         // A section block-info starts a new section at the current depth
         token.depth = (stack.at(-1)?.depth ?? 0) + 1;
         if (stack.length > 0) {

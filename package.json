@@ -8,6 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/jefri/jiffdown.git"
   },
+  "main": "src/index.mjs",
   "author": "David Souther <davidsouther+github@gmail.com>",
   "license": "MIT",
   "bugs": {
@@ -19,6 +20,10 @@
   },
   "dependencies": {
     "github-slugger": "^2.0.0",
-    "marked": "^15.0.6"
+    "highlight.js": "^11.7.0",
+    "marked": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/marked": "^5.0.2"
   }
 }
