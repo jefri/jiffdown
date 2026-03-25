@@ -10,7 +10,7 @@ function findReference(name) {
   return REFERENCES.get(name);
 }
 
-const ReferencesName = "references";
+const ReferencesName = "references-inline";
 /** @type {import("marked").TokenizerAndRendererExtension} */
 const References = {
   name: ReferencesName,
@@ -31,9 +31,11 @@ const References = {
   },
   renderer(token) {
     const reference = findReference(token.reference.replace("#", ""));
-    const tokens =
-      reference ?
-        (reference.type === "section" ? reference.tokens : [reference]) : [];
+    const tokens = reference
+      ? reference.type === "section"
+        ? reference.tokens
+        : [reference]
+      : [];
     return this.parser.parse(tokens);
   },
 };
@@ -50,81 +52,81 @@ const Sections = {
   },
 };
 
-export function replaceWalkTokens(marked) {
+export function preprocess(md) {
   REFERENCES.clear();
   MOVED.clear();
-  const _walkTokens = marked.walkTokens;
-  marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
-    const slugger = new Slugger();
-    const values = _walkTokens.call(marked, tokens, callback);
-
-    /** @type {marked.Token[]} */
-    const stack = [];
-
-    let i = 0;
-    function popSection() {
-      const section = stack.pop();
-      if (!section) return;
-      if (stack.length > 0) {
-        stack.at(-1).tokens.push(section);
-      } else {
-        tokens.splice(section.start, i, section);
-        i = section.start + 1;
-      }
-    }
-
-    for (; i < tokens.length; i++) {
-      const token = tokens[i];
-      const pushSection = () => {
-        const slug = slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
-        const id = `#${slug}`;
-        const section = {
-          type: SectionsName,
-          id,
-          start: i,
-          depth: token.depth,
-          tokens: [token],
-        };
-        REFERENCES.set(id, section);
-        stack.push(section);
-        token.id = section.id;
-        return section;
-      };
-
-      if (token.type === "heading") {
-        if (stack.length === 0) {
-          pushSection(token);
-        } else if (token.depth > stack.at(-1).depth) {
-          pushSection(token);
-        } else {
-          while (stack.at(-1) && token.depth <= stack.at(-1).depth) {
-            popSection();
-          }
-        }
-        const section = pushSection();
-        section.tokens.push(token);
-      } else if (token.type === "block-info" && token.info.tag === "section") {
-        // A section block-info starts a new section at the current depth
-        token.depth = (stack.at(-1)?.depth ?? 0) + 1;
-        if (stack.length > 0) {
-          popSection();
-        }
-        pushSection();
-      } else if (stack.length > 0) {
-        stack.at(-1).tokens.push(token);
-      }
-    }
-
-    while (stack.length > 0) {
-      popSection();
-    }
-
-    return values;
-  };
+  return md;
 }
 
-export default {
-  name: "references",
+export function processAllTokens(tokens) {
+  const slugger = new Slugger();
+
+  /** @type {marked.Token[]} */
+  const stack = [];
+
+  let i = 0;
+  function popSection() {
+    const section = stack.pop();
+    if (!section) return;
+    if (stack.length > 0) {
+      stack.at(-1).tokens.push(section);
+    } else {
+      tokens.splice(section.start, i, section);
+      i = section.start + 1;
+    }
+  }
+
+  for (; i < tokens.length; i++) {
+    const token = tokens[i];
+    const pushSection = () => {
+      const slug = slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
+      const id = `#${slug}`;
+      const section = {
+        type: SectionsName,
+        id,
+        start: i,
+        depth: token.depth,
+        tokens: [token],
+      };
+      REFERENCES.set(id, section);
+      stack.push(section);
+      token.id = section.id;
+      return section;
+    };
+
+    if (token.type === "heading") {
+      if (stack.length === 0) {
+        pushSection(token);
+      } else if (token.depth > stack.at(-1).depth) {
+        pushSection(token);
+      } else {
+        while (stack.at(-1) && token.depth <= stack.at(-1).depth) {
+          popSection();
+        }
+      }
+      const section = pushSection();
+      section.tokens.push(token);
+    } else if (token.type === "block-info" && token.info.tag === "section") {
+      // A section block-info starts a new section at the current depth
+      token.depth = (stack.at(-1)?.depth ?? 0) + 1;
+      if (stack.length > 0) {
+        popSection();
+      }
+      pushSection();
+    } else if (stack.length > 0) {
+      stack.at(-1).tokens.push(token);
+    }
+  }
+
+  while (stack.length > 0) {
+    popSection();
+  }
+
+  return tokens;
+}
+
+const FindReferences = {
+  name: "references-block",
   renderer: {
     heading(token) {
       const { tokens, depth } = token;
@@ -139,4 +141,10 @@ export default {
       REFERENCES.set(token.id, token);
     }
   },
+  hooks: {
+    preprocess,
+    processAllTokens,
+  },
 };
+
+export default FindReferences;

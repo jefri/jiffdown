@@ -15,6 +15,14 @@ test("section stack", () => {
 
   assert.equal(
     result,
-    `<section>\n<p>Section Content-1</p>\n</section>\n<section>\n<p>Section Content-2</p>\n</section>\n`
+    [
+      "<section>",
+      "<p>Section Content-1</p>",
+      "</section>",
+      "<section>",
+      "<p>Section Content-2</p>",
+      "</section>",
+      "",
+    ].join("\n"),
   );
 });

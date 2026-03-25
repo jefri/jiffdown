@@ -21,9 +21,6 @@
   "dependencies": {
     "github-slugger": "^2.0.0",
     "highlight.js": "^11.7.0",
-    "marked": "^4.3.0"
-  },
-  "devDependencies": {
-    "@types/marked": "^5.0.2"
+    "marked": "^17.0.5"
   }
 }

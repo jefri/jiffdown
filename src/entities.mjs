@@ -1,5 +1,5 @@
 import { marked } from "marked";
-import HTML_ENTITIES from "./known_entities.json" assert { type: "json" };
+import HTML_ENTITIES from "./known_entities.json" with { type: "json" };
 
 function isHtmlEntity(name) {
   return HTML_ENTITIES[`&${name};`] !== undefined;
