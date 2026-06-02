@@ -1,6 +1,6 @@
 import Slugger from "github-slugger";
 
-/** @type {Map<string, string>} */
+/** @type {Map<string, any>} */
 const REFERENCES = new Map();
 /** @type {Set<string>} */
 const MOVED = new Set();
@@ -10,10 +10,10 @@ function findReference(name) {
   return REFERENCES.get(name);
 }
 
-const ReferencesName = "references";
+const ReferencesInlineName = "references-inline"; // was "references"
 /** @type {import("marked").TokenizerAndRendererExtension} */
 const References = {
-  name: ReferencesName,
+  name: ReferencesInlineName,
   level: "inline",
   start(src) {
     return src.indexOf("&{");
@@ -22,7 +22,7 @@ const References = {
     const match = src.match(/^&\{(?<ref>[^}]+)};/);
     if (match) {
       return {
-        type: ReferencesName,
+        type: ReferencesInlineName,
         raw: match[0],
         reference: match.groups.ref,
       };
@@ -50,81 +50,126 @@ const Sections = {
   },
 };
 
-export function replaceWalkTokens(marked) {
+const ReferencesBlockName = "references-block"; // was "references"
+
+/**
+ * preprocess hook — runs once at the start of every marked.parse().
+ * Clears module-level REFERENCES (Map) and MOVED (Set) so reference state
+ * never leaks between parses. Replaces the per-call reset formerly performed
+ * at the top of replaceWalkTokens.
+ * @param {string} markdown
+ * @returns {string}
+ */
+function preprocess(markdown) {
   REFERENCES.clear();
   MOVED.clear();
-  const _walkTokens = marked.walkTokens;
-  marked.walkTokens = function walkTokensToBuildSections(tokens, callback) {
-    const slugger = new Slugger();
-    const values = _walkTokens.call(marked, tokens, callback);
+  return markdown;
+}
 
-    /** @type {marked.Token[]} */
-    const stack = [];
-
-    let i = 0;
-    function popSection() {
-      const section = stack.pop();
-      if (!section) return;
-      if (stack.length > 0) {
-        stack.at(-1).tokens.push(section);
-      } else {
-        tokens.splice(section.start, i, section);
-        i = section.start + 1;
-      }
+/**
+ * Recursively register every token carrying an `id` into REFERENCES.
+ * Replicates the former extension `walkTokens` callback. It MUST run before
+ * the section stack algorithm: that algorithm reassigns `token.id` on section
+ * roots (to `#slug`), and references like `&{#section-ref};` resolve against
+ * the original block-info `id`, so the map entry has to be keyed before the
+ * id is overwritten.
+ * @param {import("marked").Token[]} tokens
+ */
+function registerIds(tokens) {
+  for (const token of tokens) {
+    if (token.id) {
+      REFERENCES.set(token.id, token);
     }
+    if (Array.isArray(token.tokens)) {
+      registerIds(token.tokens);
+    }
+    if (Array.isArray(token.items)) {
+      registerIds(token.items);
+    }
+  }
+}
 
-    for (; i < tokens.length; i++) {
-      const token = tokens[i];
-      const pushSection = () => {
-        const slug = slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
-        const id = `#${slug}`;
-        const section = {
-          type: SectionsName,
-          id,
-          start: i,
-          depth: token.depth,
-          tokens: [token],
-        };
-        REFERENCES.set(id, section);
-        stack.push(section);
-        token.id = section.id;
-        return section;
+/**
+ * processAllTokens hook — receives the full top-level token list after
+ * tokenization and returns it restructured, with `section` tokens built
+ * around headings and `block-info` sections. Body is the stack algorithm
+ * formerly run inside the walkTokens closure.
+ * Invariants:
+ *  - REFERENCES is populated with every section id BEFORE any inline
+ *    reference renderer runs (so &{ref}; can resolve).
+ *  - MOVED records ids relocated into a parent section, so the `section`
+ *    renderer does not double-emit a section that was nested.
+ * @param {import("marked").Token[]} tokens
+ * @returns {import("marked").Token[]}
+ */
+function processAllTokens(tokens) {
+  registerIds(tokens);
+
+  const slugger = new Slugger();
+
+  /** @type {any[]} */
+  const stack = [];
+
+  let i = 0;
+  function popSection() {
+    const section = stack.pop();
+    if (!section) return;
+    if (stack.length > 0) {
+      stack.at(-1).tokens.push(section);
+    } else {
+      tokens.splice(section.start, i, section);
+      i = section.start + 1;
+    }
+  }
+
+  for (; i < tokens.length; i++) {
+    const token = tokens[i];
+    const pushSection = () => {
+      // Headings carry no id yet, so slug their text; block-info section
+      // markers already carry their declared id (e.g. `#section-ref`), which
+      // is what inline references resolve against, so reuse it.
+      const id =
+        token.id ?? slugger.slug(token.raw.replace(/^#+[\s\t]+/, ""));
+      const section = {
+        type: SectionsName,
+        id,
+        start: i,
+        depth: token.depth,
+        tokens: [token],
       };
+      REFERENCES.set(id, section);
+      stack.push(section);
+      token.id = id;
+      return section;
+    };
 
-      if (token.type === "heading") {
-        if (stack.length === 0) {
-          pushSection(token);
-        } else if (token.depth > stack.at(-1).depth) {
-          pushSection(token);
-        } else {
-          while (stack.at(-1) && token.depth <= stack.at(-1).depth) {
-            popSection();
-          }
-        }
-        const section = pushSection();
-        section.tokens.push(token);
-      } else if (token.type === "block-info" && token.info.tag === "section") {
-        // A section block-info starts a new section at the current depth
-        token.depth = (stack.at(-1)?.depth ?? 0) + 1;
-        if (stack.length > 0) {
-          popSection();
-        }
-        pushSection();
-      } else if (stack.length > 0) {
-        stack.at(-1).tokens.push(token);
+    if (token.type === "heading") {
+      while (stack.at(-1) && token.depth <= stack.at(-1).depth) {
+        popSection();
       }
+      pushSection();
+    } else if (token.type === "block-info" && token.info.tag === "section") {
+      // A section block-info starts a new section at the current depth
+      token.depth = (stack.at(-1)?.depth ?? 0) + 1;
+      if (stack.length > 0) {
+        popSection();
+      }
+      pushSection();
+    } else if (stack.length > 0) {
+      stack.at(-1).tokens.push(token);
     }
+  }
 
-    while (stack.length > 0) {
-      popSection();
-    }
+  while (stack.length > 0) {
+    popSection();
+  }
 
-    return values;
-  };
+  return tokens;
 }
 
 export default {
-  name: "references",
+  name: ReferencesBlockName,
+  hooks: { preprocess, processAllTokens },
   renderer: {
     heading(token) {
       const { tokens, depth } = token;
@@ -134,9 +179,4 @@ export default {
     },
   },
   extensions: [Sections, References],
-  walkTokens(token) {
-    if (token.id) {
-      REFERENCES.set(token.id, token);
-    }
-  },
 };

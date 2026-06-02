@@ -26,7 +26,7 @@ const BLOCK_INFO = {
       /^(?<leader>[ \t]*>[ \t]?\{(?<info>[^}]+)\}).*(?:\n\n|$)?/
     );
     if (match) {
-      const text = src
+      const text = match[0]
         .replace(match.groups?.leader, "")
         .replace(/^ *>[ \t]?/gm, "")
         .trim();
@@ -46,6 +46,12 @@ const BLOCK_INFO = {
     return false;
   },
   renderer(token) {
+    // A `> {section ...}` marker only opens a section; the wrapping
+    // <section> element is emitted by the references extension's section
+    // renderer, so the marker itself renders to nothing.
+    if (token.info.tag === "section") {
+      return "";
+    }
     return renderInfo(token.info, this.parser.parse(token.tokens), "block");
   },
 };
