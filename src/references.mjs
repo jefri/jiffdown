@@ -13,7 +13,6 @@ const MOVED = new Set();
 const RENDERING = new Set();
 
 function findReference(name) {
-  MOVED.add(name);
   return REFERENCES.get(name);
 }
 
@@ -109,6 +108,50 @@ function registerIds(tokens) {
 }
 
 /**
+ * Walk the restructured token tree and record into MOVED every section id that
+ * is referenced from OUTSIDE its own subtree. Running this after sectioning,
+ * before any rendering, makes suppression independent of document order: a
+ * `&{#id};` placed after its target section suppresses the standalone section
+ * just as one placed before it would.
+ *
+ * `sectionStack` is the chain of enclosing section ids. A reference whose
+ * target is one of its ancestors is self-referential (degenerate) and must NOT
+ * move the section, otherwise a section that only references itself would
+ * vanish entirely. Traverses nested `tokens`, list `items`, and table
+ * `header`/`rows` cells so references buried in those structures are seen.
+ * @param {import("marked").Token[]} tokens
+ * @param {string[]} sectionStack
+ */
+function recordMoved(tokens, sectionStack) {
+  for (const token of tokens) {
+    if (token.type === ReferencesInlineName) {
+      const target = token.reference.replace("#", "");
+      if (!sectionStack.includes(target)) {
+        MOVED.add(target);
+      }
+    }
+    const childStack =
+      token.type === SectionsName ?
+        [...sectionStack, token.id]
+      : sectionStack;
+    if (Array.isArray(token.tokens)) {
+      recordMoved(token.tokens, childStack);
+    }
+    if (Array.isArray(token.items)) {
+      recordMoved(token.items, childStack);
+    }
+    if (Array.isArray(token.header)) {
+      recordMoved(token.header, childStack);
+    }
+    if (Array.isArray(token.rows)) {
+      for (const row of token.rows) {
+        recordMoved(row, childStack);
+      }
+    }
+  }
+}
+
+/**
  * processAllTokens hook — receives the full top-level token list after
  * tokenization and returns it restructured, with `section` tokens built
  * around headings and `block-info` sections. Body is the stack algorithm
@@ -116,8 +159,9 @@ function registerIds(tokens) {
  * Invariants:
  *  - REFERENCES is populated with every section id BEFORE any inline
  *    reference renderer runs (so &{ref}; can resolve).
- *  - MOVED records ids relocated into a parent section, so the `section`
- *    renderer does not double-emit a section that was nested.
+ *  - MOVED records every section referenced from outside itself, so the
+ *    `section` renderer suppresses the standalone copy regardless of whether
+ *    the reference appears before or after the target in document order.
  * @param {import("marked").Token[]} tokens
  * @returns {import("marked").Token[]}
  */
@@ -182,6 +226,8 @@ function processAllTokens(tokens) {
   while (stack.length > 0) {
     popSection();
   }
+
+  recordMoved(tokens, []);
 
   return tokens;
 }

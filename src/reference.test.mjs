@@ -19,6 +19,23 @@ test("section stack", () => {
   );
 });
 
+test("reference suppresses its target regardless of document order", () => {
+  // Section A is the target; sibling section B references it. The standalone
+  // A must be suppressed even though A renders before the reference in B.
+  const after = toHTML(
+    `> {section #a}\n\nContent A\n\n> {section #b}\n\nSee &{#a};`
+  );
+  const before = toHTML(
+    `> {section #b}\n\nSee &{#a};\n\n> {section #a}\n\nContent A`
+  );
+
+  assert.equal(after, before);
+  assert.equal(
+    after,
+    `<section>\n<p>See <p>Content A</p>\n</p>\n</section>\n`
+  );
+});
+
 test("self-referential section does not recurse unbounded", () => {
   const md = `> {section #a}\n\nSelf reference: &{#a};`;
 
