@@ -4,6 +4,13 @@ import Slugger from "github-slugger";
 const REFERENCES = new Map();
 /** @type {Set<string>} */
 const MOVED = new Set();
+/**
+ * Ids whose referenced content is currently being rendered. Guards against a
+ * section that references itself (`> {section #a}` containing `&{#a};`), which
+ * would otherwise re-parse its own tokens without bound.
+ * @type {Set<string>}
+ */
+const RENDERING = new Set();
 
 function findReference(name) {
   MOVED.add(name);
@@ -30,11 +37,22 @@ const References = {
     return false;
   },
   renderer(token) {
-    const reference = findReference(token.reference.replace("#", ""));
+    const name = token.reference.replace("#", "");
+    // A reference encountered while its own content is rendering is
+    // self-referential; emit nothing to break the recursion.
+    if (RENDERING.has(name)) {
+      return "";
+    }
+    const reference = findReference(name);
     const tokens =
       reference ?
         (reference.type === "section" ? reference.tokens : [reference]) : [];
-    return this.parser.parse(tokens);
+    RENDERING.add(name);
+    try {
+      return this.parser.parse(tokens);
+    } finally {
+      RENDERING.delete(name);
+    }
   },
 };
 
@@ -63,6 +81,7 @@ const ReferencesBlockName = "references-block"; // was "references"
 function preprocess(markdown) {
   REFERENCES.clear();
   MOVED.clear();
+  RENDERING.clear();
   return markdown;
 }
 
