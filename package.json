@@ -8,7 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/jefri/jiffdown.git"
   },
-  "main": "src/index.mjs",
+  "main": "index.mjs",
   "author": "David Souther <davidsouther+github@gmail.com>",
   "license": "MIT",
   "bugs": {
