@@ -16,6 +16,24 @@ function findReference(name) {
   return REFERENCES.get(name);
 }
 
+/** @param {import("marked").Token} token */
+function refName(token) {
+  return token.reference.replace("#", "");
+}
+
+/**
+ * The block tokens a reference resolves to: a section's children, a bare
+ * referenced token, or nothing when the id is unknown. Shared by the inline
+ * renderer and the paragraph hoist so both resolve a reference identically.
+ * @param {string} name
+ * @returns {import("marked").Token[]}
+ */
+function resolveTokens(name) {
+  const reference = findReference(name);
+  if (!reference) return [];
+  return reference.type === SectionsName ? reference.tokens : [reference];
+}
+
 const ReferencesInlineName = "references-inline"; // was "references"
 /** @type {import("marked").TokenizerAndRendererExtension} */
 const References = {
@@ -36,19 +54,15 @@ const References = {
     return false;
   },
   renderer(token) {
-    const name = token.reference.replace("#", "");
+    const name = refName(token);
     // A reference encountered while its own content is rendering is
     // self-referential; emit nothing to break the recursion.
     if (RENDERING.has(name)) {
       return "";
     }
-    const reference = findReference(name);
-    const tokens =
-      reference ?
-        (reference.type === "section" ? reference.tokens : [reference]) : [];
     RENDERING.add(name);
     try {
-      return this.parser.parse(tokens);
+      return this.parser.parse(resolveTokens(name));
     } finally {
       RENDERING.delete(name);
     }
@@ -152,6 +166,84 @@ function recordMoved(tokens, sectionStack) {
 }
 
 /**
+ * A `references-inline` token is hoistable when its target is a genuine
+ * cross-reference: registered, and recorded in MOVED (referenced from outside
+ * its own subtree). Self-references are never in MOVED, so they are left to the
+ * inline renderer's recursion guard, which emits nothing.
+ * @param {import("marked").Token} token
+ */
+function isHoistable(token) {
+  if (token.type !== ReferencesInlineName) return false;
+  const name = refName(token);
+  return MOVED.has(name) && REFERENCES.has(name);
+}
+
+/**
+ * Split a paragraph around every hoistable reference it contains. Runs of
+ * ordinary inline tokens become their own `paragraph`; each reference is
+ * replaced by the block tokens it resolves to (a section's child tokens, or a
+ * bare referenced token). The result is a flat list of block tokens with no
+ * reference left inside an inline position.
+ * @param {import("marked").Token} paragraph
+ * @returns {import("marked").Token[]}
+ */
+function splitParagraph(paragraph) {
+  /** @type {import("marked").Token[]} */
+  const out = [];
+  /** @type {import("marked").Token[]} */
+  let run = [];
+  const flush = () => {
+    if (run.length === 0) return;
+    out.push({ type: "paragraph", raw: "", text: "", tokens: run });
+    run = [];
+  };
+  for (const inline of paragraph.tokens) {
+    if (isHoistable(inline)) {
+      flush();
+      out.push(...resolveTokens(refName(inline)));
+    } else {
+      run.push(inline);
+    }
+  }
+  flush();
+  return out;
+}
+
+/**
+ * After sectioning, hoist block content referenced from inside a paragraph out
+ * to sibling block tokens. A `<p>` may not contain block content (WHATWG: the
+ * p element's content model is phrasing content; a `<p>` start tag closes any
+ * open `<p>`), so rendering a section reference inline produced
+ * `<p>See <p>Content A</p></p>` — which a browser reparses into detached
+ * siblings. Splitting the host paragraph emits those siblings directly, so the
+ * serialization matches the DOM a browser would build.
+ *
+ * Only `paragraph` tokens are split, and recursion descends into `section`
+ * tokens only. References in list items and table cells are not wrapped in a
+ * `paragraph`, and block content is valid flow content there, so those are left
+ * to the inline renderer unchanged.
+ * @param {import("marked").Token[]} tokens
+ */
+function hoistReferences(tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type === SectionsName && Array.isArray(token.tokens)) {
+      hoistReferences(token.tokens);
+    }
+    if (
+      token.type !== "paragraph" ||
+      !Array.isArray(token.tokens) ||
+      !token.tokens.some(isHoistable)
+    ) {
+      continue;
+    }
+    const replacement = splitParagraph(token);
+    tokens.splice(i, 1, ...replacement);
+    i += replacement.length - 1;
+  }
+}
+
+/**
  * processAllTokens hook — receives the full top-level token list after
  * tokenization and returns it restructured, with `section` tokens built
  * around headings and `block-info` sections. Body is the stack algorithm
@@ -180,7 +272,12 @@ function processAllTokens(tokens) {
     if (stack.length > 0) {
       stack.at(-1).tokens.push(section);
     } else {
-      tokens.splice(section.start, i, section);
+      // Replace the span this section consumed (marker through the token
+      // before the current index) with the single section token. deleteCount
+      // is the span length `i - section.start`, not the absolute index `i`:
+      // for any section past the first, `i` would delete trailing siblings,
+      // including the marker currently being processed.
+      tokens.splice(section.start, i - section.start, section);
       i = section.start + 1;
     }
   }
@@ -228,6 +325,7 @@ function processAllTokens(tokens) {
   }
 
   recordMoved(tokens, []);
+  hoistReferences(tokens);
 
   return tokens;
 }
