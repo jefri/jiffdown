@@ -9,6 +9,14 @@
     "url": "git+https://github.com/jefri/jiffdown.git"
   },
   "main": "index.mjs",
+  "files": [
+    "index.mjs",
+    "index.d.ts",
+    "src",
+    "!src/**/*.test.mjs",
+    "LICENSE",
+    "README.md"
+  ],
   "author": "David Souther <davidsouther+github@gmail.com>",
   "license": "MIT",
   "bugs": {
@@ -16,7 +24,8 @@
   },
   "homepage": "https://github.com/jefri/jiffdown#readme",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "stamp": "node scripts/stamp.mjs"
   },
   "dependencies": {
     "github-slugger": "^2.0.0",
